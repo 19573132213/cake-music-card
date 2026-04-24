@@ -11,3 +11,9 @@
 - 简洁美观UI，适配电脑端浏览
 
 ## 项目预览
+点击页面右边的Release
+[点击观看完整演示](https://github.com/19573132213/cake-music-card/releases/download/%E8%9B%8B%E7%B3%95%E9%9F%B3%E7%AC%A6%E8%B4%BA%E5%8D%A1/2026-04-24.18.14.24.mov)
+
+
+## 使用方法
+直接打开 `cake-music-card.html` 即可使用。
