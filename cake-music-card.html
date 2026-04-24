@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎵 蛋糕音乐贺卡</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    overflow: hidden;
+    font-family: 'Noto Serif SC', serif;
+    background: #faf6f0;
+    color: #5a4a3a;
+  }
+  body::before {
+    content: ''; position: fixed; top:0; left:0; width:100%; height:100%;
+    pointer-events: none; z-index: 1000;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+  }
+  #canvas3d { position: fixed; top:0; left:0; width:100%; height:100%; z-index:0; }
+  .panel {
+    position:fixed; top:0; width:240px; height:100vh; z-index:10;
+    background: rgba(250,246,240,0.92);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(90,74,58,0.12);
+    padding: 16px 12px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(90,74,58,0.2) transparent;
+  }
+  .panel::-webkit-scrollbar { width:3px; }
+  .panel::-webkit-scrollbar-thumb { background:rgba(90,74,58,0.2); border-radius:2px; }
+  #leftPanel { left:0; border-right: 1px solid rgba(90,74,58,0.12); }
+  #rightPanel { right:0; border-left: 1px solid rgba(90,74,58,0.12); }
+  .panel h2 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 18px; color: #6b5a48;
+    margin-bottom: 10px; text-align:center;
+    border-bottom: 1px solid rgba(90,74,58,0.15);
+    padding-bottom: 6px;
+  }
+  .blessing-text {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 16px; line-height: 1.7;
+    color: #5a4a3a; text-align:center;
+    min-height: 50px; word-break: break-all;
+  }
+  textarea {
+    width:100%; height:70px; resize:none;
+    border: 1px solid rgba(90,74,58,0.2);
+    border-radius: 6px; padding:8px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px; color: #5a4a3a;
+    background: rgba(255,252,245,0.8);
+    outline:none;
+  }
+  textarea:focus { border-color: rgba(90,74,58,0.4); }
+  .setting-group { margin-bottom: 10px; }
+  .setting-group label {
+    display: flex; justify-content: space-between; align-items:center;
+    font-size: 11px; color: #6b5a48; margin-bottom: 2px;
+  }
+  .setting-group label span.val {
+    font-weight: bold; color: #5a4a3a; min-width:28px; text-align:right; font-size: 11px;
+  }
+  input[type="range"] {
+    width:100%; height:3px; -webkit-appearance:none; appearance:none;
+    background: rgba(90,74,58,0.15); border-radius:2px; outline:none; cursor:pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:12px; height:12px;
+    background: #8b7355; border-radius:50%; cursor:pointer;
+  }
+  #bottomBar {
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    z-index:10; display:flex; align-items:center; gap:12px;
+    background: rgba(250,246,240,0.92);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(90,74,58,0.15);
+    border-radius: 24px; padding: 8px 20px;
+  }
+  .btn {
+    border:none; border-radius:16px; padding:6px 16px;
+    font-family:'Noto Serif SC',serif; font-size:13px;
+    cursor:pointer; transition: all 0.2s;
+  }
+  .btn-play { background: #8b7355; color:#fff; }
+  .btn-play:hover { background:#9a8265; }
+  .btn-stop { background: rgba(90,74,58,0.1); color:#5a4a3a; }
+  .btn-stop:hover { background: rgba(90,74,58,0.2); }
+  #layerInfo { font-size:12px; color:#6b5a48; min-width:80px; text-align:center; }
+  .section-title {
+    font-size:11px; font-weight:bold; color:#6b5a48;
+    margin: 12px 0 6px 0; padding-top:6px;
+    border-top: 1px solid rgba(90,74,58,0.1);
+  }
+  #melodyInfo { font-size:11px; color:#7a6a5a; line-height:1.5; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="canvas3d"></canvas>
+
+<div class="panel" id="leftPanel">
+  <h2>🎵 音乐蛋糕贺卡</h2>
+  <div class="section-title">✨ 祝福语</div>
+  <textarea id="blessingInput" placeholder="请输入对应的祝福语"></textarea>
+  <div style="margin-top:8px;">
+    <div class="section-title">📜 当前祝福</div>
+    <div class="blessing-text" id="blessingDisplay">祝你生日快乐</div>
+  </div>
+  <div style="margin-top:12px;">
+    <div class="section-title">🎵 旋律信息</div>
+    <div id="melodyInfo"></div>
+  </div>
+</div>
+
+<div class="panel" id="rightPanel">
+  <h2>⚙️ 设置</h2>
+  <div class="section-title">🍰 蛋糕参数</div>
+  <div class="setting-group">
+    <label>层数 <span class="val" id="layersVal">5</span></label>
+    <input type="range" id="layersSlider" min="4" max="10" value="5" step="1" oninput="onSettingChange()">
+  </div>
+  <div class="setting-group">
+    <label>层间距 <span class="val" id="spacingVal">1.0</span></label>
+    <input type="range" id="spacingSlider" min="0.6" max="2.0" value="1.0" step="0.1" oninput="onSettingChange()">
+  </div>
+  <div class="setting-group">
+    <label>五线谱宽度比 <span class="val" id="staffWidthVal">1.0</span></label>
+    <input type="range" id="staffWidthSlider" min="0.5" max="1.5" value="1.0" step="0.05" oninput="onSettingChange()">
+  </div>
+  <div class="section-title">🎵 播放参数</div>
+  <div class="setting-group">
+    <label>播放速度 <span class="val" id="speedVal">1.0</span></label>
+    <input type="range" id="speedSlider" min="0.3" max="2.0" value="1.0" step="0.1" oninput="onSettingChange()">
+  </div>
+  <div class="setting-group">
+    <label>节奏 BPM <span class="val" id="bpmVal">120</span></label>
+    <input type="range" id="bpmSlider" min="60" max="180" value="120" step="5" oninput="onSettingChange()">
+  </div>
+  <div class="section-title">✨ 粒子</div>
+  <div class="setting-group">
+    <label>数量 <span class="val" id="starCountVal">50</span></label>
+    <input type="range" id="starCountSlider" min="10" max="150" value="50" step="5" oninput="onSettingChange()">
+  </div>
+  <div class="setting-group">
+    <label>下落速度 <span class="val" id="starSpeedVal">0.6</span></label>
+    <input type="range" id="starSpeedSlider" min="0.2" max="2.0" value="0.6" step="0.1" oninput="onSettingChange()">
+  </div>
+</div>
+
+<div id="bottomBar">
+  <button class="btn btn-play" id="playBtn" onclick="togglePlay()">▶ 播放</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopPlay()">⏹ 重置</button>
+  <div id="layerInfo">就绪</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============ GLOBALS ============
+let scene, camera, renderer, controls;
+let cakeGroup, playheadGroup;
+let starParticles = [];
+let isPlaying = false, isPaused = false;
+let currentLayer = 0;
+let playheadProgress = 0;
+let melodyData = [];
+let synth;
+let clock = new THREE.Clock();
+let scheduledEvents = [];
+let playStartTime = 0;
+
+// Default settings for reset
+const DEFAULT_SETTINGS = {
+  layers: 5, spacing: 1.0, staffWidth: 1.0,
+  speed: 1.0, bpm: 120, starCount: 50, starSpeed: 0.6,
+};
+
+const settings = { ...DEFAULT_SETTINGS };
+
+// Ink colors - hand-drawn feel
+const INK = {
+  main: 0x4a3a2a,
+  light: 0x8b7355,
+  staff: 0x6b5a48,
+  highlight: 0xc44,
+};
+
+// Per-layer instrument timbres (oscillator types)
+const LAYER_TIMBRES = ['fmtriangle', 'triangle', 'fmsine', 'triangle', 'fmtriangle', 'fmsine', 'triangle', 'fmtriangle', 'fmsine', 'triangle'];
+
+// ============ HAPPY BIRTHDAY ============
+const HAPPY_BIRTHDAY = [
+  // Happy birthday to you
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'D5', dur:'4n', type:'quarter' },
+  { freq:'C5', dur:'4n', type:'quarter' },
+  { freq:'F5', dur:'4n', type:'quarter' },
+  { freq:'E5', dur:'2n', type:'half' },
+  // Happy birthday to you
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'D5', dur:'4n', type:'quarter' },
+  { freq:'C5', dur:'4n', type:'quarter' },
+  { freq:'G5', dur:'4n', type:'quarter' },
+  { freq:'F5', dur:'2n', type:'half' },
+  // Happy birthday dear friend
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'C5', dur:'8n', type:'eighth' },
+  { freq:'C6', dur:'4n', type:'quarter' },
+  { freq:'A5', dur:'4n', type:'quarter' },
+  { freq:'F5', dur:'4n', type:'quarter' },
+  { freq:'E5', dur:'4n', type:'quarter' },
+  { freq:'D5', dur:'2n', type:'half' },
+  // Happy birthday to you
+  { freq:'B5', dur:'8n', type:'eighth' },
+  { freq:'B5', dur:'8n', type:'eighth' },
+  { freq:'A5', dur:'4n', type:'quarter' },
+  { freq:'F5', dur:'4n', type:'quarter' },
+  { freq:'G5', dur:'4n', type:'quarter' },
+  { freq:'F5', dur:'1n', type:'whole' },
+];
+
+const NOTE_NAMES = ['C5','D5','E5','F5','G5','A5','B5','C6','D6','E6'];
+const DUR_TYPES = ['quarter','quarter','quarter','half','eighth','eighth','whole'];
+
+// Scale degrees for transposition (relative to C major)
+const SCALE_DEGREES = [0, 2, 4, 5, 7, 9, 11]; // C D E F G A B
+const ALL_NOTES = ['C3','D3','E3','F3','G3','A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5','B5','C6'];
+
+function textToVariation(text) {
+  // Each character maps to one note, based on Happy Birthday melody pattern
+  // Text length determines total note count
+  const notes = [];
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+
+    // Pick a base note from Happy Birthday pattern (cycle through)
+    const baseNote = HAPPY_BIRTHDAY[i % HAPPY_BIRTHDAY.length];
+    const baseIdx = ALL_NOTES.indexOf(baseNote.freq);
+
+    // Shift pitch by character: range [-2, +4] semitones for musicality
+    const semitoneShift = (code % 7) - 2;
+    const newIdx = Math.max(0, Math.min(ALL_NOTES.length - 1, baseIdx + semitoneShift));
+
+    // Duration varies by character
+    const durVariants = ['eighth', 'quarter', 'quarter', 'quarter', 'half'];
+    const newType = durVariants[(code + i) % durVariants.length];
+
+    notes.push({
+      freq: ALL_NOTES[newIdx],
+      dur: newType === 'eighth' ? '8n' : newType === 'half' ? '2n' : '4n',
+      type: newType,
+      staffPos: newIdx % 10
+    });
+  }
+  return notes;
+}
+
+function buildMelodyData(text) {
+  let allNotes = (!text || text.trim() === '') ? [...HAPPY_BIRTHDAY] : textToVariation(text);
+  const layers = settings.layers;
+  const topHalfWidth = 0.7 * settings.staffWidth;
+  const bottomHalfWidth = 3.2 * settings.staffWidth;
+
+  const widths = [];
+  let totalWidth = 0;
+  for (let i = 0; i < layers; i++) {
+    const t = layers > 1 ? i / (layers - 1) : 0;
+    const w = topHalfWidth + (bottomHalfWidth - topHalfWidth) * t;
+    widths.push(w);
+    totalWidth += w;
+  }
+
+  melodyData = [];
+  let noteIndex = 0;
+  for (let i = 0; i < layers; i++) {
+    const proportion = widths[i] / totalWidth;
+    const count = Math.max(2, Math.round(allNotes.length * proportion));
+    const layerNotes = allNotes.slice(noteIndex, noteIndex + count).map(n => ({
+      ...n,
+      staffPos: n.staffPos !== undefined ? n.staffPos : NOTE_NAMES.indexOf(n.freq)
+    }));
+    melodyData.push({ notes: layerNotes });
+    noteIndex += count;
+  }
+
+  if (noteIndex < allNotes.length) {
+    const remaining = allNotes.slice(noteIndex).map(n => ({
+      ...n,
+      staffPos: n.staffPos !== undefined ? n.staffPos : NOTE_NAMES.indexOf(n.freq)
+    }));
+    melodyData[melodyData.length - 1].notes.push(...remaining);
+  }
+
+  updateMelodyInfo();
+}
+
+function updateMelodyInfo() {
+  const info = document.getElementById('melodyInfo');
+  const totalNotes = melodyData.reduce((s, l) => s + l.notes.length, 0);
+  const hasText = document.getElementById('blessingInput').value.trim();
+  info.innerHTML = `层数: ${melodyData.length} · 音符: ${totalNotes}`;
+}
+
+// ============ SCENE SETUP ============
+function initScene() {
+  const canvas = document.getElementById('canvas3d');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0xfaf6f0);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xfaf6f0, 15, 50);
+
+  camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 3.5, 12);
+
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.target.set(0, 3.5, 0);
+  controls.minDistance = 4;
+  controls.maxDistance = 35;
+
+  scene.add(new THREE.AmbientLight(0xfff8f0, 0.9));
+  const dirLight = new THREE.DirectionalLight(0xfff5e8, 0.5);
+  dirLight.position.set(5, 10, 8);
+  scene.add(dirLight);
+  const fillLight = new THREE.DirectionalLight(0xf0f0ff, 0.2);
+  fillLight.position.set(-5, 5, -5);
+  scene.add(fillLight);
+
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ============ HAND-DRAWN HELPERS ============
+function createWobblyLine(points, color, opacity = 0.7) {
+  const wobblePts = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const wobble = i === 0 || i === points.length - 1 ? 0 : (Math.random() - 0.5) * 0.015;
+    wobblePts.push(new THREE.Vector3(p.x + wobble, p.y + wobble * 0.5, p.z));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(wobblePts);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  return new THREE.Line(geo, mat);
+}
+
+// ============ HAND-DRAWN NOTE ============
+function createHandDrawnNote(type) {
+  const group = new THREE.Group();
+  const color = INK.main;
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
+
+  // Note head - hand-drawn ellipse outline
+  const headPts = [];
+  const headR = 0.09;
+  for (let i = 0; i <= 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const rx = headR * 1.4 + (Math.random() - 0.5) * 0.01;
+    const ry = headR + (Math.random() - 0.5) * 0.01;
+    headPts.push(new THREE.Vector3(Math.cos(angle) * rx, Math.sin(angle) * ry, 0));
+  }
+  const headGeo = new THREE.BufferGeometry().setFromPoints(headPts);
+  group.add(new THREE.Line(headGeo, mat));
+
+  // Fill (slightly behind the outline to avoid z-fighting)
+  const fillGeo = new THREE.CircleGeometry(headR * 0.7, 12);
+  const fillMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+  const fill = new THREE.Mesh(fillGeo, fillMat);
+  fill.scale.set(1.4, 1, 1);
+  fill.position.z = -0.001;
+  group.add(fill);
+
+  // Stem
+  if (type !== 'whole') {
+    const stemPts = [
+      new THREE.Vector3(headR * 1.3, 0, 0),
+      new THREE.Vector3(headR * 1.3 + (Math.random() - 0.5) * 0.02, 0.5 + (Math.random() - 0.5) * 0.02, 0)
+    ];
+    const stemGeo = new THREE.BufferGeometry().setFromPoints(stemPts);
+    group.add(new THREE.Line(stemGeo, mat));
+  }
+
+  // Flag for eighth
+  if (type === 'eighth') {
+    const flagPts = [];
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      flagPts.push(new THREE.Vector3(
+        headR * 1.3 + t * 0.1 + (Math.random() - 0.5) * 0.01,
+        0.5 - t * 0.15 + (Math.random() - 0.5) * 0.01, 0
+      ));
+    }
+    const flagGeo = new THREE.BufferGeometry().setFromPoints(flagPts);
+    group.add(new THREE.Line(flagGeo, mat));
+  }
+
+  return group;
+}
+
+// ============ BUILD CAKE ============
+function buildCake() {
+  if (cakeGroup) {
+    scene.remove(cakeGroup);
+    cakeGroup.traverse(child => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    });
+  }
+  cakeGroup = new THREE.Group();
+
+  const { layers, spacing, staffWidth } = settings;
+  const topHalfWidth = 0.7 * staffWidth;
+  const bottomHalfWidth = 3.2 * staffWidth;
+  const staffLineGap = 0.14;
+
+  buildMelodyData(document.getElementById('blessingInput').value);
+
+  const totalHeight = (layers - 1) * spacing;
+
+  // Center camera on cake
+  const cakeCenterY = totalHeight / 2;
+  controls.target.set(0, cakeCenterY, 0);
+  camera.position.set(0, cakeCenterY, 12);
+
+  for (let i = 0; i < layers; i++) {
+    const t = layers > 1 ? i / (layers - 1) : 0;
+    const halfWidth = topHalfWidth + (bottomHalfWidth - topHalfWidth) * t;
+    const y = totalHeight - i * spacing;
+    const layerData = melodyData[i] || { notes: [] };
+
+    // Five staff lines
+    for (let s = 0; s < 5; s++) {
+      const lineY = y + (s - 2) * staffLineGap;
+      const pts = [];
+      const segments = 20;
+      for (let j = 0; j <= segments; j++) {
+        const x = -halfWidth * 0.9 + (j / segments) * halfWidth * 1.8;
+        const wobble = (Math.random() - 0.5) * 0.012;
+        pts.push(new THREE.Vector3(x, lineY + wobble, 0));
+      }
+      cakeGroup.add(createWobblyLine(pts, INK.staff, 0.45));
+    }
+
+    // Side brackets
+    const bracketPtsL = [], bracketPtsR = [];
+    for (let s = 0; s < 5; s++) {
+      const lineY = y + (s - 2) * staffLineGap;
+      bracketPtsL.push(new THREE.Vector3(-halfWidth * 0.92, lineY, 0));
+      bracketPtsR.push(new THREE.Vector3(halfWidth * 0.92, lineY, 0));
+    }
+    cakeGroup.add(createWobblyLine(bracketPtsL, INK.staff, 0.35));
+    cakeGroup.add(createWobblyLine(bracketPtsR, INK.staff, 0.35));
+
+    // Place notes
+    const notes = layerData.notes;
+    const noteCount = notes.length;
+    const noteSpan = halfWidth * 1.6;
+    const noteSpacing = noteCount > 1 ? noteSpan / (noteCount - 1) : 0;
+    const startX = -noteSpan / 2;
+
+    for (let n = 0; n < noteCount; n++) {
+      const note = notes[n];
+      const x = noteCount === 1 ? 0 : startX + n * noteSpacing;
+      const noteY = y + (note.staffPos - 4.5) * staffLineGap * 0.5;
+
+      const noteMesh = createHandDrawnNote(note.type);
+      noteMesh.position.set(x, noteY, 0.02);
+      noteMesh.userData = { layerIdx: i, noteIdx: n };
+      cakeGroup.add(noteMesh);
+    }
+  }
+
+  buildTopCandle(totalHeight);
+  buildBear(totalHeight);
+  buildBalloons(totalHeight);
+  buildPlayhead();
+  scene.add(cakeGroup);
+}
+
+function buildTopCandle(topY) {
+  const group = new THREE.Group();
+  const baseY = topY + 0.15;
+  const candleH = 0.7;
+
+  // Candle body - hand-drawn rectangle outline
+  const bodyMat = new THREE.LineBasicMaterial({ color: INK.main, transparent: true, opacity: 0.8 });
+  const bodyPts = [
+    new THREE.Vector3(-0.06, baseY, 0),
+    new THREE.Vector3(-0.06 + (Math.random()-0.5)*0.01, baseY + candleH, 0),
+    new THREE.Vector3(0.06 + (Math.random()-0.5)*0.01, baseY + candleH, 0),
+    new THREE.Vector3(0.06, baseY, 0),
+    new THREE.Vector3(-0.06, baseY, 0),
+  ];
+  const bodyGeo = new THREE.BufferGeometry().setFromPoints(bodyPts);
+  group.add(new THREE.Line(bodyGeo, bodyMat));
+
+  // Candle body fill
+  const fillGeo = new THREE.PlaneGeometry(0.12, candleH);
+  const fillMat = new THREE.MeshBasicMaterial({ color: 0xfaf0e6, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false });
+  const fill = new THREE.Mesh(fillGeo, fillMat);
+  fill.position.set(0, baseY + candleH / 2, -0.001);
+  group.add(fill);
+
+  // Wick
+  const wickPts = [
+    new THREE.Vector3(0, baseY + candleH, 0),
+    new THREE.Vector3(0, baseY + candleH + 0.12, 0)
+  ];
+  const wickGeo = new THREE.BufferGeometry().setFromPoints(wickPts);
+  group.add(new THREE.Line(wickGeo, bodyMat));
+
+  // Flame - hand-drawn teardrop shape
+  const flameMat = new THREE.LineBasicMaterial({ color: 0xcc3300, transparent: true, opacity: 0.9 });
+  const flamePts = [];
+  const flameBaseY = baseY + candleH + 0.1;
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const angle = t * Math.PI * 2;
+    const r = 0.08 * Math.sin(t * Math.PI) * (1 - t * 0.3);
+    const wobble = (Math.random() - 0.5) * 0.008;
+    flamePts.push(new THREE.Vector3(
+      Math.cos(angle) * r + wobble,
+      flameBaseY + t * 0.25 + wobble * 0.5,
+      0
+    ));
+  }
+  const flameGeo = new THREE.BufferGeometry().setFromPoints(flamePts);
+  const flame = new THREE.Line(flameGeo, flameMat);
+  flame.userData.isFlame = true;
+  flame.userData.baseY = flameBaseY;
+  group.add(flame);
+
+  // Flame fill (inner glow)
+  const flameFillGeo = new THREE.CircleGeometry(0.06, 10);
+  const flameFillMat = new THREE.MeshBasicMaterial({
+    color: 0xff4400, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false
+  });
+  const flameFill = new THREE.Mesh(flameFillGeo, flameFillMat);
+  flameFill.position.set(0, flameBaseY + 0.12, -0.001);
+  flameFill.scale.set(1, 1.6, 1);
+  flameFill.userData.isFlameFill = true;
+  flameFill.userData.baseY = flameBaseY + 0.12;
+  group.add(flameFill);
+
+  // Outer glow (yellow)
+  const glowGeo = new THREE.CircleGeometry(0.1, 10);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffaa00, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.set(0, flameBaseY + 0.12, -0.002);
+  glow.scale.set(1, 1.8, 1);
+  glow.userData.isFlameGlow = true;
+  glow.userData.baseY = flameBaseY + 0.12;
+  group.add(glow);
+
+  group.userData.isCandle = true;
+  cakeGroup.add(group);
+}
+
+// ============ HAND-DRAWN BEAR (left side, no overlap) ============
+function buildBear(totalHeight) {
+  const group = new THREE.Group();
+  const mat = new THREE.LineBasicMaterial({ color: INK.main, transparent: true, opacity: 0.75 });
+  const fillMat = new THREE.MeshBasicMaterial({ color: 0xc4a882, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });
+  const centerY = 0.65; // Feet at y=0, same level as bottom staff
+
+  // Helper: hand-drawn circle
+  function drawCircle(cx, cy, r, segments = 16) {
+    const pts = [];
+    for (let i = 0; i <= segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const w = (Math.random() - 0.5) * r * 0.06;
+      pts.push(new THREE.Vector3(cx + Math.cos(a) * (r + w), cy + Math.sin(a) * (r + w), 0));
+    }
+    return pts;
+  }
+
+  // Body (outline + fill)
+  const bodyPts = drawCircle(0, centerY - 0.15, 0.35);
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(bodyPts), mat));
+  const bodyFill = new THREE.Mesh(new THREE.CircleGeometry(0.35, 16), fillMat);
+  bodyFill.position.set(0, centerY - 0.15, -0.001);
+  group.add(bodyFill);
+
+  // Head (outline + fill)
+  const headPts = drawCircle(0, centerY + 0.3, 0.25);
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(headPts), mat));
+  const headFill = new THREE.Mesh(new THREE.CircleGeometry(0.25, 16), fillMat);
+  headFill.position.set(0, centerY + 0.3, -0.001);
+  group.add(headFill);
+
+  // Ears (outline + fill)
+  const earMat = new THREE.LineBasicMaterial({ color: INK.main, transparent: true, opacity: 0.6 });
+  [[-0.2, centerY + 0.52], [0.2, centerY + 0.52]].forEach(([ex, ey]) => {
+    const earPts = drawCircle(ex, ey, 0.1, 12);
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(earPts), earMat));
+    const earFill = new THREE.Mesh(new THREE.CircleGeometry(0.1, 12), fillMat);
+    earFill.position.set(ex, ey, -0.001);
+    group.add(earFill);
+  });
+
+  // Eyes (small filled dots)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: INK.main, transparent: true, opacity: 0.8 });
+  [[-0.08, centerY + 0.35], [0.08, centerY + 0.35]].forEach(([ex, ey]) => {
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.03, 8), eyeMat);
+    eye.position.set(ex, ey, 0.01);
+    group.add(eye);
+  });
+
+  // Nose
+  const nose = new THREE.Mesh(new THREE.CircleGeometry(0.04, 8), eyeMat);
+  nose.position.set(0, centerY + 0.27, 0.01);
+  group.add(nose);
+
+  // Mouth (small smile arc)
+  const smilePts = [];
+  for (let i = 0; i <= 8; i++) {
+    const a = Math.PI * 0.15 + (i / 8) * Math.PI * 0.7;
+    smilePts.push(new THREE.Vector3(Math.cos(a) * 0.06, centerY + 0.22 - Math.sin(a) * 0.04, 0));
+  }
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(smilePts), mat));
+
+  // Arms
+  const armPtsL = [new THREE.Vector3(-0.3, centerY - 0.1, 0), new THREE.Vector3(-0.45, centerY - 0.3, 0)];
+  const armPtsR = [new THREE.Vector3(0.3, centerY - 0.1, 0), new THREE.Vector3(0.45, centerY - 0.3, 0)];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(armPtsL), mat));
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(armPtsR), mat));
+
+  // Legs
+  const legPtsL = [new THREE.Vector3(-0.15, centerY - 0.45, 0), new THREE.Vector3(-0.2, centerY - 0.65, 0)];
+  const legPtsR = [new THREE.Vector3(0.15, centerY - 0.45, 0), new THREE.Vector3(0.2, centerY - 0.65, 0)];
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(legPtsL), mat));
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(legPtsR), mat));
+
+  // Position: left of cake, well outside the widest staff line edge
+  const bottomHalfWidth = 3.2 * settings.staffWidth;
+  group.position.set(-bottomHalfWidth * 1.05, 0, 0);
+  group.scale.set(1.28, 1.28, 1.28); // 200% - 20% = 160%
+  group.userData.isBear = true;
+  cakeGroup.add(group);
+}
+
+// ============ HAND-DRAWN BALLOONS (right side of layers 3-5) ============
+function buildBalloons(totalHeight) {
+  const group = new THREE.Group();
+  const mat = new THREE.LineBasicMaterial({ color: INK.main, transparent: true, opacity: 0.7 });
+  const balloonColors = [0xcc4444, 0x4488cc, 0xccaa44, 0x44aa44, 0xcc66aa];
+  const { layers, spacing, staffWidth } = settings;
+  const topHalfWidth = 0.7 * staffWidth;
+  const bottomHalfWidth = 3.2 * staffWidth;
+
+  // Calculate layer 3,4,5 (i=2,3,4) Y positions and right edge X
+  const layerConfigs = [];
+  for (let i = 2; i < Math.min(layers, 5); i++) {
+    const t = layers > 1 ? i / (layers - 1) : 0;
+    const halfWidth = topHalfWidth + (bottomHalfWidth - topHalfWidth) * t;
+    const y = totalHeight - i * spacing;
+    const rightEdge = halfWidth * 0.92 + 0.5; // Just past the staff bracket
+    layerConfigs.push({ y, rightEdge });
+  }
+
+  // Balloon configs: placed at each target layer's right side
+  const configs = [
+    { li: 0, ox: 0, oh: 0.6, ci: 0 },   // Layer 3 center
+    { li: 0, ox: 0.4, oh: 1.0, ci: 1 },  // Layer 3 upper
+    { li: 1, ox: 0.1, oh: 0.5, ci: 2 },   // Layer 4 center
+    { li: 1, ox: 0.5, oh: 0.9, ci: 3 },   // Layer 4 upper
+    { li: 2, ox: -0.1, oh: 0.4, ci: 4 },  // Layer 5 center
+  ];
+
+  configs.forEach(({ li, ox, oh, ci }) => {
+    if (li >= layerConfigs.length) return;
+    const lc = layerConfigs[li];
+    const bx = lc.rightEdge + ox;
+    const h = lc.y + oh;
+    const color = balloonColors[ci % balloonColors.length];
+    const bMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 });
+
+    // Balloon body (hand-drawn oval)
+    const pts = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      const rx = 0.2 + (Math.random() - 0.5) * 0.01;
+      const ry = 0.25 + (Math.random() - 0.5) * 0.01;
+      pts.push(new THREE.Vector3(bx + Math.cos(a) * rx, h + Math.sin(a) * ry, 0));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), bMat));
+
+    // Balloon fill
+    const fillGeo = new THREE.CircleGeometry(0.22, 14);
+    const fillMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false });
+    const fill = new THREE.Mesh(fillGeo, fillMat);
+    fill.position.set(bx, h, -0.001);
+    fill.scale.set(1, 1.15, 1);
+    group.add(fill);
+
+    // Knot
+    const knotPts = [
+      new THREE.Vector3(bx - 0.03, h - 0.25, 0),
+      new THREE.Vector3(bx + 0.03, h - 0.25, 0),
+      new THREE.Vector3(bx, h - 0.32, 0),
+    ];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(knotPts), mat));
+
+    // String (wavy line going down)
+    const stringPts = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      stringPts.push(new THREE.Vector3(
+        bx + Math.sin(t * Math.PI * 3) * 0.06,
+        h - 0.32 - t * 0.8,
+        0
+      ));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(stringPts), mat));
+  });
+
+  cakeGroup.add(group);
+}
+
+function buildPlayhead() {
+  if (playheadGroup) cakeGroup.remove(playheadGroup);
+  playheadGroup = new THREE.Group();
+
+  const pts = [new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.5, 0)];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: INK.highlight, transparent: true, opacity: 0.8 });
+  playheadGroup.add(new THREE.Line(geo, mat));
+
+  const circleGeo = new THREE.CircleGeometry(0.04, 12);
+  const circleMat = new THREE.MeshBasicMaterial({ color: INK.highlight, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+  const circle = new THREE.Mesh(circleGeo, circleMat);
+  circle.position.y = 0.55;
+  playheadGroup.add(circle);
+
+  playheadGroup.visible = false;
+  cakeGroup.add(playheadGroup);
+}
+
+// ============ FLOATING MUSIC PARTICLES (360°) ============
+function buildStars() {
+  starParticles.forEach(s => {
+    scene.remove(s.mesh);
+    if (s.mesh.material) {
+      if (s.mesh.material.map) s.mesh.material.map.dispose();
+      s.mesh.material.dispose();
+    }
+  });
+  starParticles = [];
+
+  const { starCount } = settings;
+  const symbols = ['♪', '♫', '✦', '✧', '•'];
+
+  const canvases = symbols.map(sym => {
+    const c = document.createElement('canvas');
+    c.width = 48; c.height = 48;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#8b7355';
+    ctx.font = '36px "Noto Serif SC", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sym, 24, 24);
+    return new THREE.CanvasTexture(c);
+  });
+
+  for (let i = 0; i < starCount; i++) {
+    const texIdx = Math.floor(Math.random() * canvases.length);
+    const spriteMat = new THREE.SpriteMaterial({
+      map: canvases[texIdx],
+      transparent: true,
+      opacity: 0.2 + Math.random() * 0.35,
+      color: INK.light
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    const s = 0.1 + Math.random() * 0.14;
+
+    // Distribute in a cylinder around the cake
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 2 + Math.random() * 5;
+    const height = Math.random() * 10;
+
+    sprite.scale.set(s, s, 1);
+    sprite.position.set(
+      Math.cos(angle) * radius,
+      height,
+      Math.sin(angle) * radius
+    );
+    scene.add(sprite);
+    starParticles.push({
+      mesh: sprite,
+      // Falling motion
+      fallSpeed: 0.3 + Math.random() * 0.5,
+      // Horizontal sway
+      swaySpeed: 0.3 + Math.random() * 0.6,
+      swayAmp: 0.2 + Math.random() * 0.5,
+      baseX: Math.cos(angle) * radius,
+      baseZ: Math.sin(angle) * radius,
+      // Vertical state
+      y: height,
+      topY: 8 + Math.random() * 4,
+      bottomY: -2 - Math.random() * 2,
+      phase: Math.random() * Math.PI * 2,
+      // Rotation
+      rotSpeed: (Math.random() - 0.5) * 0.8,
+    });
+  }
+}
+
+function updateStars(dt) {
+  const { starSpeed } = settings;
+  const t = clock.elapsedTime;
+  starParticles.forEach(s => {
+    // Slowly fall down
+    s.y -= s.fallSpeed * starSpeed * dt;
+
+    // Reset to top when falling below bottom
+    if (s.y < s.bottomY) {
+      s.y = s.topY;
+    }
+
+    // Gentle horizontal sway while falling
+    s.mesh.position.x = s.baseX + Math.sin(t * s.swaySpeed + s.phase) * s.swayAmp;
+    s.mesh.position.z = s.baseZ + Math.cos(t * s.swaySpeed * 0.7 + s.phase) * s.swayAmp * 0.6;
+    s.mesh.position.y = s.y;
+
+    // Sprite rotation
+    s.mesh.material.rotation += s.rotSpeed * dt;
+
+    // Subtle opacity pulse
+    s.mesh.material.opacity = 0.2 + Math.sin(t * 0.8 + s.phase) * 0.1 + 0.15;
+  });
+}
+
+// ============ ANIMATION ============
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  controls.update();
+  updateStars(dt);
+  updateTopCandle();
+  updatePlayhead();
+  renderer.render(scene, camera);
+}
+
+function updateTopCandle() {
+  if (!cakeGroup) return;
+  const t = clock.elapsedTime;
+  cakeGroup.traverse(child => {
+    if (child.userData.isFlame) {
+      // Flame sways left-right and slightly scales
+      child.position.x = Math.sin(t * 3.5) * 0.015;
+      child.position.y = child.userData.baseY + Math.sin(t * 5) * 0.008;
+      child.rotation.z = Math.sin(t * 4) * 0.08;
+    }
+    if (child.userData.isFlameFill) {
+      child.position.x = Math.sin(t * 3.5) * 0.015;
+      child.position.y = child.userData.baseY + Math.sin(t * 5) * 0.008;
+      child.material.opacity = 0.4 + Math.sin(t * 6) * 0.15;
+      child.scale.y = 1.6 + Math.sin(t * 4.5) * 0.2;
+    }
+    if (child.userData.isFlameGlow) {
+      child.position.x = Math.sin(t * 3.5) * 0.015;
+      child.position.y = child.userData.baseY + Math.sin(t * 5) * 0.008;
+      child.material.opacity = 0.15 + Math.sin(t * 3) * 0.08;
+      const s = 1.8 + Math.sin(t * 2.5) * 0.3;
+      child.scale.set(s, s * 1.1, 1);
+    }
+  });
+}
+
+// Rainbow colors for highlight
+const RAINBOW = [0xff0000, 0xff7700, 0xffdd00, 0x00cc44, 0x0088ff, 0x4400cc, 0xaa00cc];
+
+function updatePlayhead() {
+  if (!isPlaying || !playheadGroup || !cakeGroup) {
+    if (playheadGroup && playheadGroup.visible) playheadGroup.visible = false;
+    return;
+  }
+
+  const layerData = melodyData[currentLayer];
+  if (!layerData || layerData.notes.length === 0) return;
+
+  const { layers, spacing, staffWidth } = settings;
+  const totalHeight = (layers - 1) * spacing;
+  const t = layers > 1 ? currentLayer / (layers - 1) : 0;
+  const halfWidth = (0.7 + (3.2 - 0.7) * t) * staffWidth;
+  const y = totalHeight - currentLayer * spacing;
+
+  const noteSpan = halfWidth * 1.6;
+  const x = -noteSpan / 2 + playheadProgress * noteSpan;
+
+  playheadGroup.position.set(x, y, 0.05);
+  playheadGroup.visible = true;
+
+  // Highlight notes with rainbow
+  cakeGroup.children.forEach(child => {
+    if (child.userData && child.userData.layerIdx !== undefined) {
+      const isActive = child.userData.layerIdx === currentLayer;
+      const dist = isActive ? Math.abs(child.position.x - x) : 999;
+      const shouldHighlight = dist < 0.35;
+
+      child.children.forEach(c => {
+        if (c.material) {
+          if (shouldHighlight) {
+            const rainbowIdx = child.userData.noteIdx % RAINBOW.length;
+            c.material.color = new THREE.Color(RAINBOW[rainbowIdx]);
+            c.material.opacity = 1;
+          } else {
+            c.material.color = new THREE.Color(INK.main);
+            c.material.opacity = c.material._origOpacity !== undefined ? c.material._origOpacity : 0.85;
+          }
+        }
+      });
+    }
+  });
+}
+
+// ============ AUDIO ============
+let Tone = null;
+let synthForLayer = {}; // Cache synths per timbre
+
+async function initAudio() {
+  if (!Tone) {
+    const toneModule = await import('https://esm.sh/tone@14.7.77');
+    Tone = toneModule;
+  }
+}
+
+function getSynthForTimbre(timbreType) {
+  if (!synthForLayer[timbreType]) {
+    // Different envelope shapes per timbre for variety
+    const envelopes = {
+      'triangle':    { attack: 0.008, decay: 0.12, sustain: 0.5, release: 0.3 },
+      'sine':        { attack: 0.008, decay: 0.1,  sustain: 0.45, release: 0.35 },
+      'fmsine':      { attack: 0.008, decay: 0.15, sustain: 0.5, release: 0.3 },
+      'fmtriangle':  { attack: 0.005, decay: 0.1,  sustain: 0.55, release: 0.25 },
+      'amsine':      { attack: 0.008, decay: 0.12, sustain: 0.45, release: 0.3 },
+    };
+    const env = envelopes[timbreType] || envelopes['sine'];
+    synthForLayer[timbreType] = new Tone.Synth({
+      oscillator: { type: timbreType },
+      envelope: env
+    }).toDestination();
+    synthForLayer[timbreType].volume.value = -6;
+  }
+  return synthForLayer[timbreType];
+}
+
+async function scheduleLayer(layerIdx) {
+  if (!Tone || layerIdx >= melodyData.length) return;
+
+  const layerData = melodyData[layerIdx];
+  const { bpm, speed } = settings;
+  const beatDur = 60 / bpm / speed;
+  let time = 0;
+
+  // Each layer gets a different timbre
+  const timbreType = LAYER_TIMBRES[layerIdx % LAYER_TIMBRES.length];
+  const layerSynth = getSynthForTimbre(timbreType);
+
+  for (let i = 0; i < layerData.notes.length; i++) {
+    const note = layerData.notes[i];
+    let dur;
+    switch (note.type) {
+      case 'whole': dur = beatDur * 4; break;
+      case 'half': dur = beatDur * 2; break;
+      case 'eighth': dur = beatDur * 0.5; break;
+      default: dur = beatDur;
+    }
+
+    const noteTime = playStartTime + time;
+    scheduledEvents.push({ note: note.freq, time: noteTime, duration: dur * 0.9, layerIdx, noteIdx: i });
+
+    try { layerSynth.triggerAttackRelease(note.freq, dur * 0.9, noteTime); } catch(e) {}
+    time += dur;
+  }
+
+  scheduledEvents.push({ type: 'nextLayer', time: playStartTime + time, nextLayer: layerIdx + 1 });
+}
+
+async function startPlayback() {
+  try {
+    await initAudio();
+    await Tone.start();
+    Tone.getTransport().bpm.value = settings.bpm;
+
+    playStartTime = Tone.now() + 0.1;
+    currentLayer = 0;
+    playheadProgress = 0;
+    scheduledEvents = [];
+
+    await scheduleLayer(0);
+    isPlaying = true;
+    isPaused = false;
+
+    document.getElementById('playBtn').textContent = '⏸ 暂停';
+    document.getElementById('layerInfo').textContent = `第 1 / ${melodyData.length} 层`;
+    checkPlaybackProgress();
+  } catch(e) {
+    console.error('Playback error:', e);
+    alert('音频播放失败，请检查浏览器是否支持 Web Audio API');
+  }
+}
+
+function checkPlaybackProgress() {
+  if (!isPlaying || !Tone) return;
+  const now = Tone.now();
+
+  const nextEvt = scheduledEvents.find(e => e.type === 'nextLayer' && e.time <= now && !e.done);
+  if (nextEvt) {
+    nextEvt.done = true;
+    if (nextEvt.nextLayer < melodyData.length) {
+      currentLayer = nextEvt.nextLayer;
+      playStartTime = now;
+      playheadProgress = 0;
+      scheduleLayer(currentLayer);
+      document.getElementById('layerInfo').textContent = `第 ${currentLayer + 1} / ${melodyData.length} 层`;
+    } else {
+      stopPlay();
+      return;
+    }
+  }
+
+  const layerEvts = scheduledEvents.filter(e => e.layerIdx === currentLayer && e.noteIdx !== undefined);
+  if (layerEvts.length > 0) {
+    const first = layerEvts[0].time;
+    const last = layerEvts[layerEvts.length - 1].time;
+    const dur = last - first + 0.3;
+    playheadProgress = Math.max(0, Math.min(1, (now - first) / dur));
+  }
+
+  requestAnimationFrame(checkPlaybackProgress);
+}
+
+function pausePlayback() {
+  if (!isPlaying) return;
+  isPaused = true;
+  isPlaying = false;
+  // Release all synths
+  Object.values(synthForLayer).forEach(s => { try { s.releaseAll(); } catch(e) {} });
+  scheduledEvents = [];
+  document.getElementById('playBtn').textContent = '▶ 继续';
+  document.getElementById('layerInfo').textContent = `已暂停 · 第 ${currentLayer + 1} 层`;
+}
+
+async function resumePlayback() {
+  if (!isPaused) return;
+  try {
+    await Tone.start();
+    playStartTime = Tone.now() + 0.05;
+    scheduledEvents = [];
+
+    const layerData = melodyData[currentLayer];
+    if (!layerData || layerData.notes.length === 0) { stopPlay(); return; }
+
+    const { bpm, speed } = settings;
+    const beatDur = 60 / bpm / speed;
+    let time = 0;
+
+    const startNoteIdx = Math.min(
+      Math.floor(playheadProgress * layerData.notes.length),
+      layerData.notes.length - 1
+    );
+
+    const timbreType = LAYER_TIMBRES[currentLayer % LAYER_TIMBRES.length];
+    const layerSynth = getSynthForTimbre(timbreType);
+
+    for (let i = startNoteIdx; i < layerData.notes.length; i++) {
+      const note = layerData.notes[i];
+      let dur;
+      switch (note.type) {
+        case 'whole': dur = beatDur * 4; break;
+        case 'half': dur = beatDur * 2; break;
+        case 'eighth': dur = beatDur * 0.5; break;
+        default: dur = beatDur;
+      }
+
+      const noteTime = playStartTime + time;
+      scheduledEvents.push({ note: note.freq, time: noteTime, duration: dur * 0.9, layerIdx: currentLayer, noteIdx: i });
+      try { layerSynth.triggerAttackRelease(note.freq, dur * 0.9, noteTime); } catch(e) {}
+      time += dur;
+    }
+
+    scheduledEvents.push({ type: 'nextLayer', time: playStartTime + time, nextLayer: currentLayer + 1 });
+
+    if (layerData.notes.length > 1) {
+      playheadProgress = startNoteIdx / (layerData.notes.length - 1);
+    } else {
+      playheadProgress = 0;
+    }
+
+    isPaused = false;
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = '⏸ 暂停';
+    document.getElementById('layerInfo').textContent = `第 ${currentLayer + 1} / ${melodyData.length} 层`;
+    checkPlaybackProgress();
+  } catch(e) {
+    console.error('Resume error:', e);
+    stopPlay();
+    await startPlayback();
+  }
+}
+
+function stopPlay() {
+  stopPlaybackOnly();
+}
+
+// ============ UI ============
+window.togglePlay = async function() {
+  if (isPlaying) {
+    pausePlayback();
+  } else if (isPaused) {
+    await resumePlayback();
+  } else {
+    await startPlayback();
+  }
+};
+
+window.stopPlay = function() {
+  resetAll();
+};
+
+function resetAll() {
+  stopPlaybackOnly();
+
+  // Reset all settings to defaults
+  Object.assign(settings, DEFAULT_SETTINGS);
+
+  // Reset UI controls
+  document.getElementById('layersSlider').value = DEFAULT_SETTINGS.layers;
+  document.getElementById('spacingSlider').value = DEFAULT_SETTINGS.spacing;
+  document.getElementById('staffWidthSlider').value = DEFAULT_SETTINGS.staffWidth;
+  document.getElementById('speedSlider').value = DEFAULT_SETTINGS.speed;
+  document.getElementById('bpmSlider').value = DEFAULT_SETTINGS.bpm;
+  document.getElementById('starCountSlider').value = DEFAULT_SETTINGS.starCount;
+  document.getElementById('starSpeedSlider').value = DEFAULT_SETTINGS.starSpeed;
+
+  document.getElementById('layersVal').textContent = DEFAULT_SETTINGS.layers;
+  document.getElementById('spacingVal').textContent = DEFAULT_SETTINGS.spacing.toFixed(1);
+  document.getElementById('staffWidthVal').textContent = DEFAULT_SETTINGS.staffWidth.toFixed(2);
+  document.getElementById('speedVal').textContent = DEFAULT_SETTINGS.speed.toFixed(1);
+  document.getElementById('bpmVal').textContent = DEFAULT_SETTINGS.bpm;
+  document.getElementById('starCountVal').textContent = DEFAULT_SETTINGS.starCount;
+  document.getElementById('starSpeedVal').textContent = DEFAULT_SETTINGS.starSpeed.toFixed(1);
+
+  // Reset blessing
+  document.getElementById('blessingInput').value = '';
+  document.getElementById('blessingDisplay').textContent = '祝你生日快乐';
+
+  buildCake();
+  buildStars();
+
+  document.getElementById('playBtn').textContent = '▶ 播放';
+  document.getElementById('layerInfo').textContent = '就绪';
+}
+
+window.onSettingChange = function() {
+  settings.layers = parseInt(document.getElementById('layersSlider').value);
+  settings.spacing = parseFloat(document.getElementById('spacingSlider').value);
+  settings.staffWidth = parseFloat(document.getElementById('staffWidthSlider').value);
+  settings.speed = parseFloat(document.getElementById('speedSlider').value);
+  settings.bpm = parseInt(document.getElementById('bpmSlider').value);
+  settings.starCount = parseInt(document.getElementById('starCountSlider').value);
+  settings.starSpeed = parseFloat(document.getElementById('starSpeedSlider').value);
+
+  document.getElementById('layersVal').textContent = settings.layers;
+  document.getElementById('spacingVal').textContent = settings.spacing.toFixed(1);
+  document.getElementById('staffWidthVal').textContent = settings.staffWidth.toFixed(2);
+  document.getElementById('speedVal').textContent = settings.speed.toFixed(1);
+  document.getElementById('bpmVal').textContent = settings.bpm;
+  document.getElementById('starCountVal').textContent = settings.starCount;
+  document.getElementById('starSpeedVal').textContent = settings.starSpeed.toFixed(1);
+
+  rebuildAll();
+};
+
+function stopPlaybackOnly() {
+  isPlaying = false;
+  isPaused = false;
+  currentLayer = 0;
+  playheadProgress = 0;
+  scheduledEvents = [];
+  Object.values(synthForLayer).forEach(s => { try { s.releaseAll(); } catch(e) {} });
+  if (playheadGroup) {
+    playheadGroup.visible = false;
+    playheadGroup.position.set(0, 0, 0);
+  }
+  if (cakeGroup) {
+    cakeGroup.children.forEach(child => {
+      if (child.userData && child.userData.layerIdx !== undefined) {
+        child.children.forEach(c => {
+          if (c.material) {
+            c.material.color = new THREE.Color(INK.main);
+            c.material.opacity = c.material._origOpacity !== undefined ? c.material._origOpacity : 0.85;
+          }
+        });
+      }
+    });
+  }
+  document.getElementById('playBtn').textContent = '▶ 播放';
+  document.getElementById('layerInfo').textContent = '就绪';
+}
+
+function rebuildAll() {
+  stopPlaybackOnly();
+  buildCake();
+  buildStars();
+}
+
+document.getElementById('blessingInput').addEventListener('input', function() {
+  // Preserve user's original formatting (newlines, spaces, etc.)
+  const text = this.value;
+  document.getElementById('blessingDisplay').textContent = text || '祝你生日快乐';
+  if (this._rebuildTimer) cancelAnimationFrame(this._rebuildTimer);
+  this._rebuildTimer = requestAnimationFrame(() => { rebuildAll(); });
+});
+
+// ============ INIT ============
+initScene();
+buildCake();
+buildStars();
+animate();
+</script>
+</body>
+</html>
